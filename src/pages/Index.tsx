@@ -15,27 +15,28 @@ interface Plan {
   name: string;
   amount: number;
   price: number;
+  tariff_id: number;
   popular?: boolean;
 }
 
 const plans: Record<ServiceType, Plan[]> = {
   followers: [
-    { id: 'f1', name: 'Старт', amount: 100, price: 299 },
-    { id: 'f2', name: 'Рост', amount: 500, price: 1199, popular: true },
-    { id: 'f3', name: 'Про', amount: 1000, price: 2199 },
-    { id: 'f4', name: 'Мега', amount: 5000, price: 9999 },
+    { id: 'f1', name: 'Старт', amount: 100, price: 299, tariff_id: 1 },
+    { id: 'f2', name: 'Рост', amount: 500, price: 1199, tariff_id: 2, popular: true },
+    { id: 'f3', name: 'Про', amount: 1000, price: 2199, tariff_id: 3 },
+    { id: 'f4', name: 'Мега', amount: 5000, price: 9999, tariff_id: 4 },
   ],
   viewers: [
-    { id: 'v1', name: 'Старт', amount: 50, price: 499 },
-    { id: 'v2', name: 'Рост', amount: 200, price: 1599, popular: true },
-    { id: 'v3', name: 'Про', amount: 500, price: 3499 },
-    { id: 'v4', name: 'Мега', amount: 1000, price: 6299 },
+    { id: 'v1', name: 'Старт', amount: 50, price: 499, tariff_id: 10 },
+    { id: 'v2', name: 'Рост', amount: 200, price: 1599, tariff_id: 11, popular: true },
+    { id: 'v3', name: 'Про', amount: 500, price: 3499, tariff_id: 12 },
+    { id: 'v4', name: 'Мега', amount: 1000, price: 6299, tariff_id: 13 },
   ],
   views: [
-    { id: 'w1', name: 'Старт', amount: 1000, price: 199 },
-    { id: 'w2', name: 'Рост', amount: 5000, price: 799, popular: true },
-    { id: 'w3', name: 'Про', amount: 10000, price: 1399 },
-    { id: 'w4', name: 'Мега', amount: 50000, price: 5999 },
+    { id: 'w1', name: 'Старт', amount: 1000, price: 199, tariff_id: 20 },
+    { id: 'w2', name: 'Рост', amount: 5000, price: 799, tariff_id: 21, popular: true },
+    { id: 'w3', name: 'Про', amount: 10000, price: 1399, tariff_id: 22 },
+    { id: 'w4', name: 'Мега', amount: 50000, price: 5999, tariff_id: 23 },
   ],
 };
 
@@ -45,6 +46,7 @@ const Index = () => {
   const [twitchUrl, setTwitchUrl] = useState('');
   const [currency, setCurrency] = useState('RUB');
   const [step, setStep] = useState<'service' | 'plan' | 'details' | 'payment'>('service');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleServiceSelect = (service: ServiceType) => {
     setSelectedService(service);
@@ -57,12 +59,50 @@ const Index = () => {
     setStep('details');
   };
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
     if (!twitchUrl.includes('twitch.tv')) {
       toast.error('Укажите корректный URL Twitch канала');
       return;
     }
-    toast.success('Переход к оплате через epaycore...');
+
+    if (!selectedPlanData) return;
+
+    setIsLoading(true);
+    try {
+      const response = await fetch('https://functions.poehali.dev/3520df43-a4f4-47ff-8b1b-933f0b9ed68e', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tariff_id: selectedPlanData.tariff_id,
+          count_items: selectedService === 'viewers' ? 1 : selectedPlanData.amount,
+          url_value: twitchUrl,
+          chatbots: false,
+          auto_start: selectedService === 'viewers',
+          auto_renewal: false,
+          interval: 5,
+          float_viewers: selectedService === 'viewers'
+        })
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        toast.success(`Заказ №${result.order.id} создан! Статус: ${result.order.status === 0 ? 'В обработке' : 'Активен'}`);
+        setTimeout(() => {
+          setStep('service');
+          setSelectedPlan('');
+          setTwitchUrl('');
+        }, 2000);
+      } else {
+        toast.error(result.error || 'Ошибка создания заказа');
+      }
+    } catch (error) {
+      toast.error('Не удалось создать заказ. Проверьте подключение.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const selectedPlanData = plans[selectedService].find(p => p.id === selectedPlan);
@@ -259,9 +299,19 @@ const Index = () => {
                   <Button
                     className="w-full h-14 text-lg font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-[length:200%_100%] hover:bg-[position:100%_0] transition-all duration-500"
                     onClick={handlePayment}
+                    disabled={isLoading}
                   >
-                    <Icon name="CreditCard" size={24} />
-                    <span className="ml-2">Перейти к оплате</span>
+                    {isLoading ? (
+                      <>
+                        <Icon name="Loader2" size={24} className="animate-spin" />
+                        <span className="ml-2">Создаём заказ...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Icon name="Zap" size={24} />
+                        <span className="ml-2">Создать заказ</span>
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>

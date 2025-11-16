@@ -1,0 +1,29 @@
+{
+  "tests": [
+    {
+      "name": "Create order with valid data",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "tariff_id": 28,
+        "count_items": 1,
+        "url_value": "https://twitch.tv/test_channel"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": "boolean"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Reject non-POST requests",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 405,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
